@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: swcmas-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://mongo:27017/swcmas
+      - JWT_SECRET=production_super_secret_jwt_key_2026
+      - JWT_EXPIRES_IN=7d
+      - EMAIL_HOST=smtp.mailtrap.io
+      - EMAIL_PORT=2525
+      - EMAIL_USER=your_mailtrap_user
+      - EMAIL_PASS=your_mailtrap_pass
+      - DEEPSEEK_API_KEY=your_api_key_here
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    networks:
+      - swcmas-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: swcmas-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - swcmas-network
+
+  mongo:
+    image: mongo:6.0
+    container_name: swcmas-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - swcmas-data:/data/db
+    restart: unless-stopped
+    networks:
+      - swcmas-network
+
+networks:
+  swcmas-network:
+    driver: bridge
+
+volumes:
+  swcmas-data:

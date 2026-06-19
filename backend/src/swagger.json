@@ -1,0 +1,630 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "SWCMAS API",
+    "version": "1.0.0",
+    "description": "Smart Waste Compliance, Monitoring and Analytics System — RESTful API",
+    "contact": { "name": "SWCMAS Team", "email": "admin@swcmas.go.ke" },
+    "license": { "name": "MIT" }
+  },
+  "servers": [
+    { "url": "http://localhost:5000/api/v1", "description": "Development Server" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "enum": ["county_admin","county_officer","landlord","waste_collector","resident"] },
+          "isActive": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Apartment": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "address": { "type": "string" },
+          "city": { "type": "string" },
+          "county": { "type": "string" },
+          "unitCount": { "type": "integer" },
+          "landlord": { "$ref": "#/components/schemas/User" },
+          "wasteCollector": { "$ref": "#/components/schemas/User" },
+          "collectionSchedule": {
+            "type": "object",
+            "properties": {
+              "frequency": { "type": "string", "enum": ["daily","every_other_day","weekly","biweekly","custom"] },
+              "time": { "type": "string" }
+            }
+          },
+          "trustScore": { "type": "number" }
+        }
+      },
+      "Collection": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "apartment": { "$ref": "#/components/schemas/Apartment" },
+          "wasteCollector": { "$ref": "#/components/schemas/User" },
+          "status": { "type": "string", "enum": ["scheduled","in_progress","completed","verified","disputed","missed"] },
+          "scheduledDate": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "verificationStatus": { "type": "string", "enum": ["pending","verified","suspicious","confirmed_missing"] },
+          "notes": { "type": "string" }
+        }
+      },
+      "Complaint": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "type": "string", "enum": ["missed_collection","illegal_dumping","overflowing_bins","bad_odor","burning_waste","other"] },
+          "status": { "type": "string", "enum": ["pending","in_progress","resolved","rejected"] },
+          "priority": { "type": "string", "enum": ["low","medium","high","critical"] },
+          "resident": { "$ref": "#/components/schemas/User" },
+          "apartment": { "$ref": "#/components/schemas/Apartment" },
+          "assignedTo": { "$ref": "#/components/schemas/User" },
+          "resolution": { "type": "string" },
+          "aiAnalysis": { "type": "object" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Anomaly": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "type": { "type": "string" },
+          "severity": { "type": "string", "enum": ["low","medium","high","critical"] },
+          "description": { "type": "string" },
+          "entityId": { "type": "string" },
+          "confidenceScore": { "type": "number" },
+          "isResolved": { "type": "boolean" },
+          "resolution": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "type": { "type": "string", "enum": ["daily","weekly","monthly"] },
+          "period": {
+            "type": "object",
+            "properties": { "start": { "type": "string", "format": "date-time" }, "end": { "type": "string", "format": "date-time" } }
+          },
+          "data": { "type": "object" },
+          "aiSummary": { "type": "string" },
+          "recommendations": { "type": "array", "items": { "type": "string" } },
+          "generatedBy": { "$ref": "#/components/schemas/User" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "title": { "type": "string" },
+          "message": { "type": "string" },
+          "type": { "type": "string" },
+          "isRead": { "type": "boolean" },
+          "recipient": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string" }
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data": { "type": "object" }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["firstName","lastName","email","password","role"],
+                "properties": {
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 },
+                  "role": { "type": "string", "enum": ["resident","landlord","waste_collector"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User registered successfully" },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Email already in use" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login and receive a JWT token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email","password"],
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful, returns JWT token" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout the current user",
+        "responses": {
+          "200": { "description": "Logged out successfully" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get the currently authenticated user",
+        "responses": {
+          "200": { "description": "Current user data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "List all users (Admin only)",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer", "default": 1 } },
+          { "in": "query", "name": "limit", "schema": { "type": "integer", "default": 20 } },
+          { "in": "query", "name": "role", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Paginated list of users" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get a user by ID",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "User data" },
+          "404": { "description": "User not found" }
+        }
+      },
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Update a user",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } }
+        },
+        "responses": { "200": { "description": "User updated" } }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Delete a user (Admin only)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "User deleted" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+    "/apartments": {
+      "get": {
+        "tags": ["Apartments"],
+        "summary": "List all apartments",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } },
+          { "in": "query", "name": "limit", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Paginated apartment list" } }
+      },
+      "post": {
+        "tags": ["Apartments"],
+        "summary": "Create a new apartment (Admin only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","address","city","county","unitCount","landlord","location","collectionSchedule"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "address": { "type": "string" },
+                  "city": { "type": "string" },
+                  "county": { "type": "string" },
+                  "unitCount": { "type": "integer" },
+                  "landlord": { "type": "string", "description": "Landlord user ID" },
+                  "wasteCollector": { "type": "string" },
+                  "location": { "type": "object", "properties": { "type": { "type": "string" }, "coordinates": { "type": "array", "items": { "type": "number" } } } },
+                  "collectionSchedule": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Apartment created" } }
+      }
+    },
+    "/apartments/{id}": {
+      "get": {
+        "tags": ["Apartments"],
+        "summary": "Get apartment by ID",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Apartment data" }, "404": { "description": "Not found" } }
+      },
+      "patch": {
+        "tags": ["Apartments"],
+        "summary": "Update an apartment",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Apartment updated" } }
+      },
+      "delete": {
+        "tags": ["Apartments"],
+        "summary": "Delete an apartment",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+    "/collections": {
+      "get": {
+        "tags": ["Collections"],
+        "summary": "List collections (role-filtered)",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } },
+          { "in": "query", "name": "status", "schema": { "type": "string" } },
+          { "in": "query", "name": "apartment", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Paginated collection list" } }
+      },
+      "post": {
+        "tags": ["Collections"],
+        "summary": "Schedule a new collection",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["apartment","wasteCollector","scheduledDate"],
+                "properties": {
+                  "apartment": { "type": "string" },
+                  "wasteCollector": { "type": "string" },
+                  "scheduledDate": { "type": "string", "format": "date-time" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Collection scheduled" } }
+      }
+    },
+    "/collections/{id}/start": {
+      "patch": {
+        "tags": ["Collections"],
+        "summary": "Mark collection as started (Collector)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Collection started" } }
+      }
+    },
+    "/collections/{id}/complete": {
+      "patch": {
+        "tags": ["Collections"],
+        "summary": "Mark collection as completed (Collector)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": { "type": "object", "properties": { "image": { "type": "string", "format": "binary" }, "notes": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Collection completed" } }
+      }
+    },
+    "/collections/{id}/verify": {
+      "patch": {
+        "tags": ["Collections"],
+        "summary": "Verify a collection (Officer/Admin)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Collection verified" } }
+      }
+    },
+    "/collections/{id}": {
+      "delete": {
+        "tags": ["Collections"],
+        "summary": "Delete a collection (Admin only)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+    "/complaints": {
+      "get": {
+        "tags": ["Complaints"],
+        "summary": "List complaints (role-filtered)",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } },
+          { "in": "query", "name": "status", "schema": { "type": "string" } },
+          { "in": "query", "name": "priority", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Paginated complaint list" } }
+      },
+      "post": {
+        "tags": ["Complaints"],
+        "summary": "File a new complaint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title","description","type"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "type": { "type": "string" },
+                  "apartment": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Complaint filed, AI analysis queued" } }
+      }
+    },
+    "/complaints/{id}": {
+      "patch": {
+        "tags": ["Complaints"],
+        "summary": "Update complaint status/priority/assignment",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string" },
+                  "priority": { "type": "string" },
+                  "assignedTo": { "type": "string" },
+                  "resolution": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Complaint updated" } }
+      },
+      "delete": {
+        "tags": ["Complaints"],
+        "summary": "Delete a complaint (Admin)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+    "/anomalies": {
+      "get": {
+        "tags": ["Anomalies"],
+        "summary": "List AI-detected anomalies (Officer/Admin)",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } },
+          { "in": "query", "name": "severity", "schema": { "type": "string" } },
+          { "in": "query", "name": "isResolved", "schema": { "type": "boolean" } }
+        ],
+        "responses": { "200": { "description": "Paginated anomaly list" } }
+      }
+    },
+    "/anomalies/{id}/resolve": {
+      "patch": {
+        "tags": ["Anomalies"],
+        "summary": "Resolve an anomaly",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "resolution": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "Anomaly resolved" } }
+      }
+    },
+    "/reports": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "List generated reports",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } },
+          { "in": "query", "name": "type", "schema": { "type": "string", "enum": ["daily","weekly","monthly"] } }
+        ],
+        "responses": { "200": { "description": "Paginated report list" } }
+      },
+      "post": {
+        "tags": ["Reports"],
+        "summary": "Generate a new AI-driven report",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["type","periodStart","periodEnd"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["daily","weekly","monthly"] },
+                  "periodStart": { "type": "string", "format": "date-time" },
+                  "periodEnd": { "type": "string", "format": "date-time" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Report generated with AI summary" } }
+      }
+    },
+    "/reports/{id}": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get full report details",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Report data with charts and AI insights" } }
+      }
+    },
+    "/verifications": {
+      "get": {
+        "tags": ["Verifications"],
+        "summary": "List verification requests for the logged-in resident",
+        "responses": { "200": { "description": "List of verification requests" } }
+      }
+    },
+    "/verifications/{id}/respond": {
+      "patch": {
+        "tags": ["Verifications"],
+        "summary": "Resident submits verification response",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["wasCollected"],
+                "properties": {
+                  "wasCollected": { "type": "boolean" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Response recorded, trust score updated" } }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "List notifications for the current user",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Paginated notification list" } }
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "tags": ["Notifications"],
+        "summary": "Mark notification as read",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Marked as read" } }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get role-based dashboard statistics",
+        "responses": { "200": { "description": "Dashboard stats, charts, and KPIs based on authenticated role" } }
+      }
+    },
+    "/maps/apartments": {
+      "get": {
+        "tags": ["Maps"],
+        "summary": "Get GeoJSON of all apartment locations",
+        "responses": { "200": { "description": "GeoJSON FeatureCollection of apartments" } }
+      }
+    },
+    "/maps/violations": {
+      "get": {
+        "tags": ["Maps"],
+        "summary": "Get GeoJSON of complaint/violation locations",
+        "responses": { "200": { "description": "GeoJSON FeatureCollection of violations" } }
+      }
+    },
+    "/maps/heatmap": {
+      "get": {
+        "tags": ["Maps"],
+        "summary": "Get complaint density heatmap data",
+        "responses": { "200": { "description": "GeoJSON points with weight property for heatmap rendering" } }
+      }
+    },
+    "/ai/analyze-complaint": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Manually trigger AI analysis on a complaint",
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "complaintId": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "AI analysis result with sentiment and priority" } }
+      }
+    },
+    "/audit": {
+      "get": {
+        "tags": ["Audit"],
+        "summary": "Retrieve audit logs (Admin only)",
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer" } },
+          { "in": "query", "name": "entity", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Paginated audit log" } }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Auth", "description": "Authentication and session management" },
+    { "name": "Users", "description": "User management (Admin)" },
+    { "name": "Apartments", "description": "Property and apartment management" },
+    { "name": "Collections", "description": "Waste collection scheduling and tracking" },
+    { "name": "Complaints", "description": "Citizen complaint management with AI triage" },
+    { "name": "Anomalies", "description": "AI-detected anomaly alerts" },
+    { "name": "Reports", "description": "AI-generated analytical reports" },
+    { "name": "Verifications", "description": "Resident collection verification requests" },
+    { "name": "Notifications", "description": "In-app notification system" },
+    { "name": "Dashboard", "description": "Role-based KPI and chart data" },
+    { "name": "Maps", "description": "Geospatial GeoJSON data endpoints" },
+    { "name": "AI", "description": "Direct AI analysis endpoints" },
+    { "name": "Audit", "description": "System audit trail" }
+  ]
+}
