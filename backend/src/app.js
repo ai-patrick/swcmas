@@ -32,6 +32,11 @@ const invoiceRoutes = require('./routes/invoice.routes');
 
 const app = express();
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date() });
+});
+
 // Database connection
 connectDB();
 
@@ -63,6 +68,10 @@ app.use(compression());
 app.use(mongoSanitize());
 app.use(xss());
 app.use(rateLimiter);
+
+// Serve uploaded files in local dev mode
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // API prefix
 app.use(config.apiPrefix, (req, res, next) => {

@@ -163,6 +163,25 @@ To stop:
 docker-compose down
 ```
 
+### Production (MongoDB Atlas)
+
+- Create an Atlas cluster and a DB user.
+- Set the `MONGODB_URI` environment variable to the Atlas SRV URI, e.g.:
+
+  ```
+  MONGODB_URI=mongodb+srv://patombithi5_db_user:<password>@cluster0.ayrmwkm.mongodb.net/swcmas?appName=Cluster0
+  ```
+
+- Deploy with the production compose file (which does **not** run a local MongoDB container):
+
+  ```bash
+  export MONGODB_URI=...
+  docker compose -f docker-compose.prod.yml up -d --build
+  ```
+
+- For local development continue using the regular `docker-compose.yml` (with the local MongoDB service).
+
+
 ---
 
 ## API Documentation
@@ -191,6 +210,7 @@ Add more tests in the `tests/` directories.
 3. **Commit Messages** – Follow conventional commits (`feat: add ...`, `fix: resolve ...`).
 4. **Pull Requests** – Open a PR against `main`, ensure CI passes, and get approval before merging.
 5. **Environment Variables** – Never commit real secrets; use `.env.example` as a template.
+   - For local development (outside Docker) you can use `MONGODB_URI=mongodb://127.0.0.1:27018/swcmas`
 
 ---
 

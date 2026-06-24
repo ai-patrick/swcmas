@@ -77,7 +77,8 @@ const FieldOpsWizard = ({ collection, onClose, onComplete }) => {
     try {
       const formData = new FormData();
       formData.append('beforePhoto', beforePhoto);
-      // We could also pass location coords if the backend supported it for startCollection
+      formData.append('startLocation[lat]', location.lat);
+      formData.append('startLocation[lng]', location.lng);
       
       await startCollection(collection._id, formData);
       toast.success('Collection started');
@@ -94,8 +95,24 @@ const FieldOpsWizard = ({ collection, onClose, onComplete }) => {
     
     setLoading(true);
     try {
+      // Get current location for endLocation
+      const endLoc = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          // Fallback to start location if geolocation unavailable
+          resolve(location || { lat: 0, lng: 0 });
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(location || { lat: 0, lng: 0 }),
+          { enableHighAccuracy: false, maximumAge: 30000, timeout: 5000 }
+        );
+      });
+
       const formData = new FormData();
       formData.append('afterPhoto', afterPhoto);
+      formData.append('endLocation[lat]', endLoc.lat);
+      formData.append('endLocation[lng]', endLoc.lng);
       
       await completeCollection(collection._id, formData);
       toast.success('Collection completed successfully!');
